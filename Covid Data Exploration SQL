@@ -1,0 +1,120 @@
+--Exploration of covid data from https://ourworldindata.org/covid-deaths
+--Following Alex Freberg's Data Analyst Portfolio Project 
+--https://www.youtube.com/watch?v=qfyynHBFOsM&t=3520s 
+
+
+SELECT location, date, total_cases, new_cases, total_deaths, population
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` 
+ORDER BY location, date
+LIMIT 100
+
+--looking at total cases vs total deaths
+--shows likelihood of dying if you contract covid in the U.S.
+
+SELECT location, date, total_cases, total_deaths, (total_deaths/total_cases)*100 AS DeathPercentage
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` 
+WHERE location= "United States"
+ORDER BY location, date DESC
+LIMIT 400
+
+--looking at total cases vs population
+--shows what percentage of population got covid
+
+SELECT location, date, total_cases, population, (total_cases/population)*100 AS CovidPopulationPercentage
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` 
+WHERE location= "United States"
+ORDER BY location, date 
+LIMIT 400
+
+--looking at countries with highest infection rate compared to population
+
+SELECT location, population, MAX(total_cases) AS HIGHESTINFECTIONCOUNT, Max((total_cases/population))*100 AS PercentagePopulationInfected
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` 
+GROUP BY location, population
+ORDER BY PercentagePopulationInfected DESC
+
+
+--showing the countries with highest death count per population
+
+SELECT location, MAX(total_deaths) AS TOTALDEATHCOUNT
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` 
+WHERE continent != "NULL"
+GROUP BY location
+ORDER BY TOTALDEATHCOUNT DESC
+
+--break down by continent
+--showing continents with highest death count per population
+
+SELECT continent, MAX(total_deaths) AS TOTALDEATHCOUNT
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` 
+WHERE continent != "NULL"
+GROUP BY continent
+ORDER BY TOTALDEATHCOUNT DESC
+
+--global numbers
+
+SELECT date, SUM(new_cases) AS total_cases, SUM(new_deaths) AS total_deaths, SUM(new_deaths)/SUM(new_cases)*100 AS DeathPercentage
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` 
+--WHERE location= "United States"
+WHERE continent != "NULL"
+GROUP BY date
+ORDER BY date
+
+--total cases, deaths, percentage of world
+
+SELECT SUM(new_cases) AS total_cases, SUM(new_deaths) AS total_deaths, SUM(new_deaths)/SUM(new_cases)*100 AS DeathPercentage
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` 
+--WHERE location= "United States"
+WHERE continent != "NULL"
+--GROUP BY date
+--ORDER BY date
+
+--joins
+
+SELECT *
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` AS dea
+JOIN `booming-quasar-330020.CovidPortfolioProject.covidvaccinations` AS vac
+  ON dea.location = vac.location
+  AND dea.date = vac.date
+
+--total population vs vaccinations
+
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` AS dea
+JOIN `booming-quasar-330020.CovidPortfolioProject.covidvaccinations` AS vac
+  ON dea.location = vac.location
+  AND dea.date = vac.date
+WHERE dea.continent != "NULL"
+ORDER BY location, date
+
+--add running total of vaccinations
+
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+SUM(vac.new_vaccinations) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date) 
+  AS rollingpeoplevaccinated
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` AS dea
+JOIN `booming-quasar-330020.CovidPortfolioProject.covidvaccinations` AS vac
+  ON dea.location = vac.location
+  AND dea.date = vac.date
+WHERE dea.continent != "NULL"
+ORDER BY location, date
+
+--use cte
+
+WITH popvsvac
+AS 
+(
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+SUM(vac.new_vaccinations) OVER (PARTITION BY dea.location ORDER BY dea.location, dea.date) 
+  AS rollingpeoplevaccinated, 
+  --rollingpeoplevaccinated/population*100
+FROM `booming-quasar-330020.CovidPortfolioProject.covid_deaths` AS dea
+JOIN `booming-quasar-330020.CovidPortfolioProject.covidvaccinations` AS vac
+  ON dea.location = vac.location
+  AND dea.date = vac.date
+WHERE dea.continent != "NULL"
+--ORDER BY location, date
+)
+SELECT *, (rollingpeoplevaccinated/population)*100 AS percentpopulationvaccinated
+FROM popvsvac
+
